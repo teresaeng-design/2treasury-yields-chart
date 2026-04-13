@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2-Year Treasury Yield vs Fed Funds Rate</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#0f1117; color:#e2e8f0; }
+
+.header { padding:28px 40px 16px; border-bottom:1px solid #1e2535; }
+.header h1 { font-size:20px; font-weight:600; color:#f1f5f9; }
+.header p  { font-size:12px; color:#64748b; margin-top:4px; }
+.header .src { font-size:10px; color:#475569; margin-top:2px; }
+
+/* ── Summary tabs ── */
+.summary { padding:16px 40px; border-bottom:1px solid #1e2535; }
+.tab-bar { display:flex; gap:0; border-bottom:1px solid #1e2535; margin-bottom:0; }
+.tab-btn {
+  padding:8px 18px; font-size:12px; font-weight:500; color:#64748b;
+  background:none; border:none; border-bottom:2px solid transparent;
+  cursor:pointer; transition:all .15s; margin-bottom:-1px; white-space:nowrap;
+}
+.tab-btn:hover { color:#94a3b8; }
+.tab-btn.on { color:#e2e8f0; border-bottom-color:#3b82f6; }
+.tab-panels { padding-top:14px; }
+.tab-panel { display:none; }
+.tab-panel.on { display:block; }
+.card { background:#161b27; border:1px solid #1e2535; border-radius:8px; padding:16px 18px; }
+.card-lbl  { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:#475569; margin-bottom:6px; }
+.card-title{ font-size:13px; font-weight:600; color:#e2e8f0; margin-bottom:8px; line-height:1.35; }
+.card-body { font-size:11.5px; color:#94a3b8; line-height:1.6; }
+.card-body strong { color:#cbd5e1; }
+.verdict { display:inline-block; margin-top:8px; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; }
+.verdict.blue   { background:#1e2e4a; color:#60a5fa; }
+.verdict.red    { background:#3b1f1f; color:#f87171; }
+.verdict.green  { background:#14432a; color:#4ade80; }
+
+/* ── Controls bar ── */
+.controls { display:flex; align-items:center; gap:12px; padding:10px 40px; background:#0d1018; border-bottom:1px solid #1e2535; flex-wrap:wrap; }
+.presets { display:flex; gap:5px; }
+.pbtn {
+  padding:4px 12px; border-radius:4px; border:1px solid #1e2535;
+  background:#161b27; color:#94a3b8; font-size:11px; cursor:pointer; transition:all .15s;
+}
+.pbtn:hover { background:#1e2535; color:#e2e8f0; }
+.pbtn.on    { background:#1e3a5f; border-color:#3b82f6; color:#93c5fd; }
+.ctrl-info  { margin-left:auto; font-size:11px; color:#475569; }
+.ctrl-info span { color:#64748b; }
+
+/* ── Charts ── */
+.charts { padding:20px 40px 0; }
+.chart-block { margin-bottom:20px; }
+.chart-hdr h3 { font-size:11px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px; }
+.chart-hdr p  { font-size:10px; color:#475569; margin-bottom:10px; }
+.legend { display:flex; gap:16px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
+.li { display:flex; align-items:center; gap:5px; font-size:11px; color:#94a3b8; }
+.ll { width:16px; height:2px; border-radius:1px; }
+.lf { width:12px; height:9px; border-radius:2px; }
+.lb { width:12px; height:9px; border-radius:2px; background:rgba(100,116,139,.2); border:1px solid rgba(100,116,139,.4); }
+.ld { width:8px; height:8px; border-radius:50%; background:#f59e0b; }
+.chart-wrap { position:relative; background:#161b27; border:1px solid #1e2535; border-radius:8px; padding:16px; }
+
+/* ── Brush ── */
+.brush-section { padding:0 40px 8px; }
+.brush-lbl { font-size:10px; color:#475569; margin-bottom:6px; letter-spacing:.4px; }
+.brush-outer {
+  position:relative; height:72px;
+  background:#161b27; border:1px solid #1e2535; border-radius:8px; overflow:hidden;
+  cursor:crosshair; user-select:none;
+}
+#brushCanvas { display:block; width:100%; height:72px; }
+/* Overlay elements drawn via JS for handle markers */
+
+/* ── Stability table ── */
+.stab-section { padding:0 40px 24px; }
+.stab-section h2 { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#475569; margin-bottom:12px; }
+.stab-table { width:100%; border-collapse:collapse; font-size:11.5px; }
+.stab-table th { text-align:left; padding:7px 10px; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:#475569; border-bottom:1px solid #1e2535; }
+.stab-table td { padding:8px 10px; border-bottom:1px solid #1a2030; color:#94a3b8; }
+.stab-table tr:hover td { background:#161b27; }
+.stab-table .period { color:#e2e8f0; font-weight:500; }
+.up   { color:#4ade80; font-weight:600; }
+.down { color:#f87171; font-weight:600; }
+.badge { display:inline-block; padding:2px 6px; border-radius:3px; font-size:9px; font-weight:600; }
+.bm { background:#1e3a5f; color:#60a5fa; }
+.bs { background:#1e2535; color:#475569; }
+
+/* ── Series toggles ── */
+.toggles { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.tog {
+  display:flex; align-items:center; gap:6px; padding:5px 12px;
+  border-radius:5px; border:1px solid; cursor:pointer;
+  font-size:11px; font-weight:500; transition:opacity .15s;
+  user-select:none;
+}
+.tog.off { opacity:.35; }
+.tog-swatch { width:10px; height:10px; border-radius:2px; }
+
+/* ── Events ── */
+.events-section { padding:0 40px 40px; }
+.events-section h2 { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:#475569; margin-bottom:10px; }
+.decade-bar { display:flex; gap:0; border-bottom:1px solid #1e2535; margin-bottom:0; }
+.dec-btn {
+  padding:7px 16px; font-size:11px; font-weight:500; color:#64748b;
+  background:none; border:none; border-bottom:2px solid transparent;
+  cursor:pointer; transition:all .15s; margin-bottom:-1px;
+}
+.dec-btn:hover { color:#94a3b8; }
+.dec-btn.on { color:#e2e8f0; border-bottom-color:#3b82f6; }
+.dec-panel { display:none; padding-top:12px; }
+.dec-panel.on { display:block; }
+.ev-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:8px; }
+.ev {
+  background:#161b27; border:1px solid #1e2535; border-left:3px solid;
+  border-radius:5px; padding:10px 12px; cursor:pointer; transition:background .15s;
+}
+.ev:hover { background:#1a2133; }
+.ev-date { font-size:10px; font-weight:600; letter-spacing:.3px; margin-bottom:2px; }
+.ev-name { font-size:12px; font-weight:600; color:#e2e8f0; margin-bottom:2px; }
+.ev-desc { font-size:11px; color:#64748b; line-height:1.45; }
+.sp-badge { font-size:10px; margin-top:4px; padding:2px 5px; border-radius:2px; display:inline-block; }
+
+/* ── Tooltip ── */
+#tt {
+  position:fixed; background:#1c2333; border:1px solid #334155; border-radius:7px;
+  padding:10px 12px; font-size:11px; color:#e2e8f0; pointer-events:none;
+  display:none; z-index:300; min-width:185px; box-shadow:0 4px 20px rgba(0,0,0,.5);
+}
+#tt .td  { color:#64748b; font-size:10px; margin-bottom:6px; font-weight:600; }
+#tt .tr  { display:flex; justify-content:space-between; gap:12px; margin-top:3px; }
+#tt .tl  { color:#94a3b8; }
+#tt .tv  { font-weight:600; }
+#tt .thr { border-top:1px solid #334155; margin-top:6px; padding-top:6px; }
+#tt .ts  { font-size:10px; color:#f59e0b; margin-top:5px; }
+
+@media(max-width:820px){
+  .cards{grid-template-columns:1fr}
+  .header,.summary,.controls,.charts,.brush-section,.stab-section,.events-section{padding-left:16px;padding-right:16px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>2-Year Treasury Yield vs. Fed Funds Rate</h1>
+  <p>Monthly averages · Jan 2006 – Mar 2026 · Green fill = 2yr &gt; FFR (hikes priced in) · Red fill = 2yr &lt; FFR (cuts priced in)</p>
+  <p class="src">Source: Federal Reserve Bank of St. Louis (FRED) — DGS2 &amp; FEDFUNDS series</p>
+</div>
+
+<div class="summary">
+  <div class="tab-bar">
+    <button class="tab-btn on" onclick="switchTab(0,this)">Q1 · Predictive accuracy</button>
+    <button class="tab-btn"   onclick="switchTab(1,this)">Q2 · What the spread means</button>
+    <button class="tab-btn"   onclick="switchTab(2,this)">Q3 · Key events</button>
+  </div>
+  <div class="tab-panels">
+    <div class="tab-panel on" id="tab0">
+      <div class="card">
+        <div class="card-title">Is the 2-year yield more "accurate" than the Fed Funds Rate?</div>
+        <div class="card-body">
+          They measure different things. The FFR is the <strong>current policy rate</strong>. The 2-year yield is a <strong>market forecast</strong> of where rates will average over the next two years.<br><br>
+          Across 12 detected stability windows, the 2-year diverged and moved ahead of the FFR by <strong>1–12 months</strong>. Longest lead: 12 months before GFC cuts (2006). Most recent: 9 months before the first 2024 cut.
+          <span class="verdict blue">Predictive, not more accurate</span>
+        </div>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab1">
+      <div class="card">
+        <div class="card-title">What does the spread (2yr − FFR) indicate?</div>
+        <div class="card-body">
+          <strong>Positive spread (green):</strong> Markets price in future hikes — 2yr trades above current FFR.<br>
+          <strong>Negative / inverted (red):</strong> Markets price in cuts. Has preceded every easing cycle in this data.<br><br>
+          Deepest inversions: −1.46% (Jan 2008, GFC) and −1.51% (Sep 2024, post-pandemic). Widest positive: +2.21% (Apr 2022, when the 2yr surged well ahead of a Fed still at zero).
+          <span class="verdict red">Deep inversion = easing cycle signal</span>
+        </div>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab2">
+      <div class="card">
+        <div class="card-title">Major financial &amp; world events (2006–2026)</div>
+        <div class="card-body">
+          <strong>2007–09:</strong> GFC — subprime collapse, Lehman, TARP, ZLB.<br>
+          <strong>2010–12:</strong> European sovereign debt crisis, US credit downgrade.<br>
+          <strong>2013:</strong> Taper Tantrum — Bernanke tapering signal spikes yields.<br>
+          <strong>2015–18:</strong> First post-GFC normalisation (0%→2.5%).<br>
+          <strong>2020:</strong> COVID — 150bps emergency cuts in two weeks.<br>
+          <strong>2022–23:</strong> Fastest hiking cycle in 40 years; worst bond drawdown on record.<br>
+          <strong>2025–26:</strong> Tariff shock; easing continues.
+          <span class="verdict green">Annotated on chart below</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="presets">
+    <button class="pbtn" onclick="setPreset(1,this)">1Y</button>
+    <button class="pbtn" onclick="setPreset(2,this)">2Y</button>
+    <button class="pbtn" onclick="setPreset(5,this)">5Y</button>
+    <button class="pbtn" onclick="setPreset(10,this)">10Y</button>
+    <button class="pbtn on" onclick="setPreset(null,this)">All</button>
+  </div>
+  <div class="ctrl-info" id="ctrlInfo"></div>
+</div>
+
+<!-- Charts -->
+<div class="charts">
+
+  <div class="chart-block">
+    <div class="chart-hdr">
+      <h3>2-Year Treasury Yield &amp; Effective Fed Funds Rate</h3>
+      <p>Shaded bands = FFR stability windows · ● = first month 2yr diverged · dashed lines = key events · hover for values</p>
+    </div>
+    <!-- Series toggles -->
+    <div class="toggles">
+      <div class="tog" id="tog0" style="border-color:#3b82f6;color:#93c5fd" onclick="toggleSeries(0)">
+        <div class="tog-swatch" style="background:#60a5fa"></div>2-Year Yield
+      </div>
+      <div class="tog" id="tog1" style="border-color:#f97316;color:#fb923c" onclick="toggleSeries(1)">
+        <div class="tog-swatch" style="background:#f97316"></div>Fed Funds Rate
+      </div>
+      <div class="tog" id="togEv" style="border-color:#475569;color:#94a3b8" onclick="toggleEvents()">
+        <div class="tog-swatch" style="background:#475569"></div>Annotated Events
+      </div>
+    </div>
+    <!-- Legend (static info) -->
+    <div class="legend">
+      <div class="li"><div class="lf" style="background:rgba(34,197,94,.2);border:1px solid rgba(34,197,94,.5)"></div>2yr &gt; FFR</div>
+      <div class="li"><div class="lf" style="background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.4)"></div>2yr &lt; FFR</div>
+      <div class="li"><div class="lb"></div>FFR stable window</div>
+      <div class="li"><div class="ld"></div>2yr divergence pt</div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="mainChart" style="height:550px"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- Brush range selector -->
+<div class="brush-section">
+  <div class="brush-lbl">DRAG TO ZOOM &nbsp;·&nbsp; DRAG SELECTION TO PAN &nbsp;·&nbsp; HANDLES TO RESIZE</div>
+  <div class="brush-outer" id="brushOuter">
+    <canvas id="brushCanvas"></canvas>
+  </div>
+</div>
+
+<!-- Events by decade (under the graph) -->
+<div class="events-section" style="padding-top:20px">
+  <h2>Annotated Events — click any event to zoom chart to ±12 months</h2>
+  <div class="decade-bar">
+    <button class="dec-btn on" onclick="switchDecade(0,this)">2000s</button>
+    <button class="dec-btn"   onclick="switchDecade(1,this)">2010s</button>
+    <button class="dec-btn"   onclick="switchDecade(2,this)">2020s</button>
+  </div>
+  <div class="dec-panel on" id="dec0"><div class="ev-grid" id="evGrid0"></div></div>
+  <div class="dec-panel"    id="dec1"><div class="ev-grid" id="evGrid1"></div></div>
+  <div class="dec-panel"    id="dec2"><div class="ev-grid" id="evGrid2"></div></div>
+</div>
+
+<!-- Spread chart -->
+<div class="charts" id="spreadSection" style="padding-top:8px">
+  <div class="chart-block">
+    <div class="chart-hdr">
+      <h3>Spread: 2-Year Yield minus Fed Funds Rate</h3>
+      <p>Green = positive (hikes priced in) · Red = inverted (cuts / recession signal)</p>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="spreadChart" style="height:200px"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Stability Windows Table -->
+<div class="stab-section">
+  <h2>FFR Stability Windows — 2-Year Yield Lead Times</h2>
+  <table class="stab-table">
+    <thead>
+      <tr>
+        <th>Period</th><th>Length</th><th>FFR Level</th>
+        <th>2yr at Start</th><th>2yr First Diverges</th>
+        <th>Direction &amp; Move</th><th>Lead Time</th><th>Size</th>
+      </tr>
+    </thead>
+    <tbody id="stabBody"></tbody>
+  </table>
+</div>
+
+<div id="tt"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// ALL DATA
+// ═══════════════════════════════════════════════
+const ALL_LABELS = ["2006-01","2006-02","2006-03","2006-04","2006-05","2006-06","2006-07","2006-08","2006-09","2006-10","2006-11","2006-12","2007-01","2007-02","2007-03","2007-04","2007-05","2007-06","2007-07","2007-08","2007-09","2007-10","2007-11","2007-12","2008-01","2008-02","2008-03","2008-04","2008-05","2008-06","2008-07","2008-08","2008-09","2008-10","2008-11","2008-12","2009-01","2009-02","2009-03","2009-04","2009-05","2009-06","2009-07","2009-08","2009-09","2009-10","2009-11","2009-12","2010-01","2010-02","2010-03","2010-04","2010-05","2010-06","2010-07","2010-08","2010-09","2010-10","2010-11","2010-12","2011-01","2011-02","2011-03","2011-04","2011-05","2011-06","2011-07","2011-08","2011-09","2011-10","2011-11","2011-12","2012-01","2012-02","2012-03","2012-04","2012-05","2012-06","2012-07","2012-08","2012-09","2012-10","2012-11","2012-12","2013-01","2013-02","2013-03","2013-04","2013-05","2013-06","2013-07","2013-08","2013-09","2013-10","2013-11","2013-12","2014-01","2014-02","2014-03","2014-04","2014-05","2014-06","2014-07","2014-08","2014-09","2014-10","2014-11","2014-12","2015-01","2015-02","2015-03","2015-04","2015-05","2015-06","2015-07","2015-08","2015-09","2015-10","2015-11","2015-12","2016-01","2016-02","2016-03","2016-04","2016-05","2016-06","2016-07","2016-08","2016-09","2016-10","2016-11","2016-12","2017-01","2017-02","2017-03","2017-04","2017-05","2017-06","2017-07","2017-08","2017-09","2017-10","2017-11","2017-12","2018-01","2018-02","2018-03","2018-04","2018-05","2018-06","2018-07","2018-08","2018-09","2018-10","2018-11","2018-12","2019-01","2019-02","2019-03","2019-04","2019-05","2019-06","2019-07","2019-08","2019-09","2019-10","2019-11","2019-12","2020-01","2020-02","2020-03","2020-04","2020-05","2020-06","2020-07","2020-08","2020-09","2020-10","2020-11","2020-12","2021-01","2021-02","2021-03","2021-04","2021-05","2021-06","2021-07","2021-08","2021-09","2021-10","2021-11","2021-12","2022-01","2022-02","2022-03","2022-04","2022-05","2022-06","2022-07","2022-08","2022-09","2022-10","2022-11","2022-12","2023-01","2023-02","2023-03","2023-04","2023-05","2023-06","2023-07","2023-08","2023-09","2023-10","2023-11","2023-12","2024-01","2024-02","2024-03","2024-04","2024-05","2024-06","2024-07","2024-08","2024-09","2024-10","2024-11","2024-12","2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12","2026-01","2026-02","2026-03"];
+const ALL_DGS2 = [4.395,4.668,4.734,4.889,4.968,5.122,5.118,4.903,4.769,4.796,4.74,4.673,4.876,4.849,4.574,4.666,4.766,4.98,4.819,4.313,4.012,3.968,3.337,3.117,2.476,1.973,1.617,2.047,2.446,2.774,2.573,2.42,2.076,1.612,1.213,0.821,0.807,0.975,0.931,0.927,0.929,1.184,1.019,1.115,0.956,0.949,0.803,0.875,0.929,0.857,0.959,1.06,0.831,0.725,0.617,0.52,0.48,0.376,0.454,0.618,0.614,0.773,0.697,0.734,0.555,0.41,0.407,0.23,0.211,0.281,0.253,0.257,0.24,0.278,0.345,0.292,0.285,0.292,0.248,0.269,0.255,0.277,0.268,0.257,0.265,0.267,0.256,0.232,0.25,0.334,0.341,0.356,0.404,0.335,0.304,0.34,0.394,0.327,0.399,0.417,0.389,0.452,0.506,0.472,0.567,0.445,0.527,0.635,0.552,0.619,0.64,0.54,0.609,0.689,0.668,0.698,0.713,0.645,0.885,0.983,0.899,0.734,0.875,0.768,0.816,0.731,0.673,0.737,0.771,0.843,0.98,1.197,1.206,1.201,1.313,1.241,1.302,1.342,1.372,1.335,1.384,1.55,1.697,1.844,2.032,2.175,2.276,2.384,2.512,2.533,2.607,2.636,2.768,2.861,2.859,2.676,2.543,2.504,2.41,2.345,2.206,1.814,1.835,1.571,1.648,1.551,1.613,1.613,1.519,1.331,0.448,0.225,0.17,0.185,0.148,0.14,0.135,0.15,0.166,0.136,0.131,0.115,0.147,0.163,0.155,0.203,0.22,0.217,0.241,0.393,0.508,0.68,0.98,1.435,1.91,2.538,2.617,2.998,3.036,3.25,3.857,4.375,4.503,4.289,4.207,4.534,4.303,4.016,4.132,4.64,4.829,4.902,5.022,5.068,4.882,4.457,4.323,4.544,4.588,4.873,4.856,4.737,4.496,3.965,3.622,3.972,4.257,4.226,4.272,4.21,3.97,3.778,3.92,3.889,3.882,3.704,3.569,3.521,3.55,3.501,3.537,3.472,3.715];
+const ALL_FF   = [4.29,4.49,4.59,4.79,4.94,4.99,5.24,5.25,5.25,5.25,5.25,5.24,5.25,5.26,5.26,5.25,5.25,5.25,5.26,5.02,4.94,4.76,4.49,4.24,3.94,2.98,2.61,2.28,1.98,2.0,2.01,2.0,1.81,0.97,0.39,0.16,0.15,0.22,0.18,0.15,0.18,0.21,0.16,0.16,0.15,0.12,0.12,0.12,0.11,0.13,0.16,0.2,0.2,0.18,0.18,0.19,0.19,0.19,0.19,0.18,0.17,0.16,0.14,0.1,0.09,0.09,0.07,0.1,0.08,0.07,0.08,0.07,0.08,0.1,0.13,0.14,0.16,0.16,0.16,0.13,0.14,0.16,0.16,0.16,0.14,0.15,0.14,0.15,0.11,0.09,0.09,0.08,0.08,0.09,0.08,0.09,0.07,0.07,0.08,0.09,0.09,0.1,0.09,0.09,0.09,0.09,0.09,0.12,0.11,0.11,0.11,0.12,0.12,0.13,0.13,0.14,0.14,0.12,0.12,0.24,0.34,0.38,0.36,0.37,0.37,0.38,0.39,0.4,0.4,0.4,0.41,0.54,0.65,0.66,0.79,0.9,0.91,1.04,1.15,1.16,1.15,1.15,1.16,1.3,1.41,1.42,1.51,1.69,1.7,1.82,1.91,1.91,1.95,2.19,2.2,2.27,2.4,2.4,2.41,2.42,2.39,2.38,2.4,2.13,2.04,1.83,1.55,1.55,1.55,1.58,0.65,0.05,0.05,0.08,0.09,0.1,0.09,0.09,0.09,0.09,0.09,0.08,0.07,0.07,0.06,0.08,0.1,0.09,0.08,0.08,0.08,0.08,0.08,0.08,0.2,0.33,0.77,1.21,1.68,2.33,2.56,3.08,3.78,4.1,4.33,4.57,4.65,4.83,5.06,5.08,5.12,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.33,5.13,4.83,4.64,4.48,4.33,4.33,4.33,4.33,4.33,4.33,4.33,4.33,4.22,4.09,3.88,3.72,3.64,3.64,3.64];
+const ALL_SPREAD = ALL_DGS2.map((v,i)=>parseFloat((v-ALL_FF[i]).toFixed(3)));
+const N = ALL_LABELS.length;
+
+const STABILITY_WINDOWS = [
+  {start:"2006-07",end:"2007-07",length:13,ffr:5.24,leadMonth:"2006-08",leadMove:-0.22,leadAhead:12,dgs2Lead:4.9, dgs2Start:5.12},
+  {start:"2008-05",end:"2008-08",length:4, ffr:1.98,leadMonth:"2008-06",leadMove:+0.33,leadAhead:3, dgs2Lead:2.77,dgs2Start:2.45},
+  {start:"2008-12",end:"2015-12",length:85,ffr:0.16,leadMonth:"2009-06",leadMove:+0.36,leadAhead:79,dgs2Lead:1.18,dgs2Start:0.82},
+  {start:"2016-01",end:"2016-11",length:11,ffr:0.34,leadMonth:"2016-07",leadMove:-0.23,leadAhead:5, dgs2Lead:0.67,dgs2Start:0.90},
+  {start:"2017-06",end:"2017-11",length:6, ffr:1.04,leadMonth:"2017-10",leadMove:+0.21,leadAhead:2, dgs2Lead:1.55,dgs2Start:1.34},
+  {start:"2018-06",end:"2018-09",length:4, ffr:1.82,leadMonth:"2018-09",leadMove:+0.23,leadAhead:1, dgs2Lead:2.77,dgs2Start:2.53},
+  {start:"2018-12",end:"2019-08",length:9, ffr:2.27,leadMonth:"2019-03",leadMove:-0.27,leadAhead:6, dgs2Lead:2.41,dgs2Start:2.68},
+  {start:"2019-11",end:"2020-02",length:4, ffr:1.55,leadMonth:"2020-02",leadMove:-0.28,leadAhead:1, dgs2Lead:1.33,dgs2Start:1.61},
+  {start:"2020-04",end:"2022-02",length:23,ffr:0.05,leadMonth:"2021-11",leadMove:+0.28,leadAhead:4, dgs2Lead:0.51,dgs2Start:0.23},
+  {start:"2023-08",end:"2024-08",length:13,ffr:5.33,leadMonth:"2023-12",leadMove:-0.45,leadAhead:9, dgs2Lead:4.46,dgs2Start:4.90},
+  {start:"2025-01",end:"2025-09",length:9, ffr:4.33,leadMonth:"2025-03",leadMove:-0.30,leadAhead:7, dgs2Lead:3.97,dgs2Start:4.27},
+  {start:"2025-12",end:"2026-03",length:4, ffr:3.72,leadMonth:"2026-03",leadMove:+0.21,leadAhead:null,dgs2Lead:3.71,dgs2Start:3.50},
+];
+
+const EVENTS = [
+  {month:"2006-07",color:"#f59e0b",name:"Fed Rate Peak — Inversion Begins",    desc:"FFR peaks at 5.25%. 2yr dips below (spread −0.12%) — first signal hiking cycle is over."},
+  {month:"2007-08",color:"#ef4444",name:"Subprime Crisis Begins",               desc:"BNP Paribas freezes three funds. Credit markets seize. 2yr already 70bps below FFR."},
+  {month:"2008-09",color:"#ef4444",name:"Lehman Brothers Collapse",             desc:"Lehman files Chapter 11. AIG bailout. Global interbank lending freezes. Fed → 0% by Dec."},
+  {month:"2009-03",color:"#22c55e",name:"QE1 / S&P 500 Bottom",                desc:"S&P 500 bottoms at 666. QE1 launched. Spread turns sharply positive."},
+  {month:"2010-05",color:"#f59e0b",name:"Flash Crash / Euro Debt Crisis",       desc:"Dow −1,000 pts intraday. Greece accepts EU-IMF bailout. Sovereign spreads blow out."},
+  {month:"2011-08",color:"#f59e0b",name:"US Credit Downgrade",                  desc:"S&P downgrades US to AA+. European crisis intensifies. Treasuries paradoxically rally."},
+  {month:"2013-05",color:"#a855f7",name:"Taper Tantrum",                        desc:"Bernanke hints at tapering. 10yr surges from 1.6%→3%. First sustained 2yr rise since GFC."},
+  {month:"2015-12",color:"#60a5fa",name:"First Post-GFC Hike",                  desc:"Fed raises 25bps — first hike since 2006, ending 7 years at the zero lower bound."},
+  {month:"2018-05",color:"#dc2626",name:"US Exits Iran Nuclear Deal (JCPOA)",   desc:"Trump withdraws from JCPOA and reimposed sanctions on Iran. Oil surges; geopolitical risk premium spikes. Yield curve already flattening aggressively."},
+  {month:"2018-08",color:"#dc2626",name:"Venezuela Hyperinflation / US Sanctions",desc:"Maduro's Venezuela hits 1,000,000% inflation. US tightens sanctions on PDVSA and the Maduro regime. Sovereign default on oil-backed bonds triggers EM contagion fears."},
+  {month:"2018-12",color:"#60a5fa",name:"Fed Pause / Q4 Rout",                  desc:"Fourth 2018 hike. S&P −20% in Q4. Markets furiously price in 2019 cuts."},
+  {month:"2020-01",color:"#dc2626",name:"Soleimani Strike — Iran War Fears",    desc:"US kills Iranian General Qasem Soleimani. Iran retaliates with missile strikes on US bases. Brief flight-to-safety Treasury rally; 2yr dips before COVID dominates."},
+  {month:"2020-03",color:"#ef4444",name:"COVID-19 Emergency Cuts",              desc:"150bps emergency cuts across two meetings. 2yr collapses to near-zero ahead of the Fed."},
+  {month:"2022-03",color:"#f97316",name:"Hiking Cycle Begins",                  desc:"First hike of fastest tightening in 40 years. 2yr had risen to 1.9% — 4 months ahead."},
+  {month:"2023-07",color:"#f97316",name:"Last Hike — Cycle Peak",               desc:"Fed peaks at 5.25–5.5%. 2yr had been below FFR for a year, pricing in imminent cuts."},
+  {month:"2024-04",color:"#dc2626",name:"Iran Directly Attacks Israel",         desc:"Iran launches 300+ drones and missiles at Israel — first direct attack in history. Brief risk-off spike; 2yr holds above 4.9% as markets see limited escalation."},
+  {month:"2024-09",color:"#22c55e",name:"First Rate Cut",                       desc:"50bps cut to 4.75–5%. 2yr had been pricing in cuts for nearly two years."},
+  {month:"2025-04",color:"#f59e0b",name:"Tariff Shock",                         desc:"Large-scale US tariff announcements spark global selloff and accelerated cut pricing."},
+];
+
+// ═══════════════════════════════════════════════
+// VIEW STATE
+// ═══════════════════════════════════════════════
+let VS = 0, VE = N - 1;
+let showEvents = false;   // events overlay off by default
+function slice(arr){ return arr.slice(VS, VE+1); }
+
+// ═══════════════════════════════════════════════
+// CUSTOM CANVAS PLUGINS
+// ═══════════════════════════════════════════════
+const fillPlugin = {
+  id:'fill',
+  beforeDatasetsDraw(chart){
+    if(chart.canvas.id !== 'mainChart') return;
+    // Only draw fill when both lines are visible
+    if(chart.data.datasets[0].hidden || chart.data.datasets[1].hidden) return;
+    const {ctx,scales} = chart;
+    const d0 = chart.data.datasets[0].data;
+    const d1 = chart.data.datasets[1].data;
+    ctx.save();
+    for(let i=0;i<d0.length-1;i++){
+      const x0=scales.x.getPixelForValue(i),   x1=scales.x.getPixelForValue(i+1);
+      const a0=scales.y.getPixelForValue(d0[i]),a1=scales.y.getPixelForValue(d0[i+1]);
+      const b0=scales.y.getPixelForValue(d1[i]),b1=scales.y.getPixelForValue(d1[i+1]);
+      ctx.beginPath();
+      ctx.moveTo(x0,a0); ctx.lineTo(x1,a1); ctx.lineTo(x1,b1); ctx.lineTo(x0,b0);
+      ctx.closePath();
+      ctx.fillStyle = d0[i]>=d1[i] ? 'rgba(34,197,94,.13)' : 'rgba(239,68,68,.11)';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+};
+
+const overlayPlugin = {
+  id:'overlay',
+  beforeDatasetsDraw(chart){
+    if(chart.canvas.id !== 'mainChart') return;
+    const {ctx,chartArea,scales} = chart;
+    if(!chartArea) return;
+    const vLabels = chart.data.labels;
+    const vLen = vLabels.length;
+    const vS = ALL_LABELS.indexOf(vLabels[0]);
+
+    STABILITY_WINDOWS.forEach(w=>{
+      const wS = ALL_LABELS.indexOf(w.start);
+      const wE = ALL_LABELS.indexOf(w.end);
+      if(wE < vS || wS > vS + vLen - 1) return;
+      const cS = Math.max(wS, vS) - vS;
+      const cE = Math.min(wE, vS + vLen - 1) - vS;
+      const x0 = scales.x.getPixelForValue(cS);
+      const x1 = scales.x.getPixelForValue(cE);
+      const major = w.length >= 6;
+      ctx.save();
+      ctx.fillStyle = major ? 'rgba(100,116,139,.09)' : 'rgba(100,116,139,.04)';
+      ctx.fillRect(x0, chartArea.top, x1-x0, chartArea.height);
+      if(major){
+        ctx.strokeStyle='rgba(100,116,139,.18)'; ctx.lineWidth=1; ctx.setLineDash([]);
+        ctx.strokeRect(x0, chartArea.top, x1-x0, chartArea.height);
+        if(x1-x0 > 52){
+          ctx.font='9px system-ui'; ctx.fillStyle='rgba(148,163,184,.5)'; ctx.textAlign='center';
+          const mx=(x0+x1)/2;
+          ctx.fillText('FFR flat', mx, chartArea.top+13);
+          if(w.leadAhead!=null){
+            ctx.fillText(`2yr leads ${w.leadAhead}m ${w.leadMove>0?'↑':'↓'}`, mx, chartArea.top+23);
+          }
+        }
+      }
+      ctx.restore();
+    });
+  },
+  afterDatasetsDraw(chart){
+    const {ctx,chartArea,scales} = chart;
+    if(!chartArea) return;
+    const vLabels = chart.data.labels;
+    const vLen = vLabels.length;
+    const vS = ALL_LABELS.indexOf(vLabels[0]);
+
+    // Event lines (both charts) — only when toggled on
+    if(showEvents){
+      EVENTS.forEach(ev=>{
+        const gIdx = ALL_LABELS.indexOf(ev.month);
+        const vIdx = gIdx - vS;
+        if(vIdx<0||vIdx>=vLen) return;
+        const x = scales.x.getPixelForValue(vIdx);
+        ctx.save();
+        ctx.strokeStyle=ev.color+'70'; ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(x,chartArea.top); ctx.lineTo(x,chartArea.bottom); ctx.stroke();
+        // Short label at top of line
+        ctx.font='9px system-ui'; ctx.fillStyle=ev.color+'cc';
+        ctx.textAlign='center'; ctx.setLineDash([]);
+        const label = ev.name.split('—')[0].split('/')[0].trim();
+        ctx.save();
+        ctx.translate(x, chartArea.top + 6);
+        ctx.rotate(-Math.PI/2);
+        ctx.fillText(label.length > 22 ? label.slice(0,20)+'…' : label, 0, 0);
+        ctx.restore();
+        ctx.restore();
+      });
+    }
+
+    // Zero line for spread chart
+    if(chart.canvas.id==='spreadChart'){
+      const y0 = scales.y.getPixelForValue(0);
+      ctx.save(); ctx.strokeStyle='#475569'; ctx.lineWidth=1; ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(chartArea.left,y0); ctx.lineTo(chartArea.right,y0); ctx.stroke(); ctx.restore();
+    }
+
+    // Divergence dots (main chart only)
+    if(chart.canvas.id!=='mainChart') return;
+    STABILITY_WINDOWS.forEach(w=>{
+      if(!w.leadMonth) return;
+      const gIdx = ALL_LABELS.indexOf(w.leadMonth);
+      const vIdx = gIdx - vS;
+      if(vIdx<0||vIdx>=vLen) return;
+      const x = scales.x.getPixelForValue(vIdx);
+      const y = scales.y.getPixelForValue(w.dgs2Lead);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x,y,5,0,Math.PI*2);
+      ctx.fillStyle='#f59e0b'; ctx.fill();
+      ctx.strokeStyle='#0f1117'; ctx.lineWidth=2; ctx.stroke();
+      ctx.restore();
+    });
+  }
+};
+Chart.register(fillPlugin, overlayPlugin);
+
+// ═══════════════════════════════════════════════
+// CHART INIT
+// ═══════════════════════════════════════════════
+const xTick = function(val,i){
+  const l = this.chart.data.labels[i]||'';
+  return l.endsWith('-01') ? l.slice(0,4) : '';
+};
+const gc = '#1a2030';
+
+const mainChart = new Chart(document.getElementById('mainChart'),{
+  type:'line',
+  data:{
+    labels: slice(ALL_LABELS),
+    datasets:[
+      {label:'2-Year Yield', data:slice(ALL_DGS2), borderColor:'#60a5fa', backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:.3},
+      {label:'Fed Funds',    data:slice(ALL_FF),   borderColor:'#f97316', backgroundColor:'transparent', borderWidth:2, pointRadius:0, tension:.3},
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{
+        enabled:false,
+        external(ctx){
+          const tt = document.getElementById('tt');
+          if(ctx.tooltip.opacity===0){tt.style.display='none';return;}
+          const pts = ctx.tooltip.dataPoints;
+          if(!pts||!pts.length) return;
+          const lbl  = pts[0].label;
+          const gIdx = ALL_LABELS.indexOf(lbl);
+          const d2   = typeof pts[0]?.raw==='number' ? pts[0].raw.toFixed(2) : '—';
+          const ff   = typeof pts[1]?.raw==='number' ? pts[1].raw.toFixed(2) : '—';
+          const sp   = gIdx>=0 ? ALL_SPREAD[gIdx] : null;
+          const spTxt= sp!=null ? (sp>=0?'+':'')+sp.toFixed(2)+'%' : '—';
+          const spCol= sp!=null ? (sp>=0?'#4ade80':'#f87171') : '#94a3b8';
+          const stab = STABILITY_WINDOWS.find(w=>{
+            const s=ALL_LABELS.indexOf(w.start), e=ALL_LABELS.indexOf(w.end);
+            return gIdx>=s && gIdx<=e;
+          });
+          tt.innerHTML=`
+            <div class="td">${lbl}</div>
+            <div class="tr"><span class="tl" style="color:#93c5fd">2-Year Yield</span><span class="tv">${d2}%</span></div>
+            <div class="tr"><span class="tl" style="color:#fb923c">Fed Funds</span><span class="tv">${ff}%</span></div>
+            <div class="tr thr"><span class="tl">Spread</span><span class="tv" style="color:${spCol}">${spTxt}</span></div>
+            ${stab?`<div class="ts">● FFR stable at ${stab.ffr}% (${stab.length}m window)</div>`:''}`;
+          const r=ctx.chart.canvas.getBoundingClientRect();
+          const left = r.left + ctx.tooltip.caretX + 16;
+          tt.style.display='block';
+          tt.style.left=(left+200>window.innerWidth ? r.left+ctx.tooltip.caretX-210 : left)+'px';
+          tt.style.top=(r.top+ctx.tooltip.caretY-10)+'px';
+        }
+      }
+    },
+    scales:{
+      x:{ticks:{color:'#475569',maxTicksLimit:16,callback:xTick},grid:{color:gc}},
+      y:{ticks:{color:'#475569',callback:v=>v.toFixed(1)+'%'},grid:{color:gc}}
+    }
+  }
+});
+
+const spreadChart = new Chart(document.getElementById('spreadChart'),{
+  type:'bar',
+  data:{
+    labels: slice(ALL_LABELS),
+    datasets:[{
+      label:'Spread',
+      data: slice(ALL_SPREAD),
+      backgroundColor: slice(ALL_SPREAD).map(v=>v>=0?'#22c55e80':'#ef444470'),
+      borderColor:     slice(ALL_SPREAD).map(v=>v>=0?'#22c55e'  :'#ef4444'),
+      borderWidth:.5, barThickness:'flex'
+    }]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>{
+        const v=ctx.parsed?.y;
+        return v!=null ? `Spread: ${v>=0?'+':''}${v.toFixed(2)}%` : '';
+      }}}
+    },
+    scales:{
+      x:{ticks:{color:'#475569',maxTicksLimit:16,callback:xTick},grid:{color:gc}},
+      y:{ticks:{color:'#475569',callback:v=>(v>=0?'+':'')+v.toFixed(1)+'%'},grid:{color:gc}}
+    }
+  }
+});
+
+// ═══════════════════════════════════════════════
+// APPLY RANGE  (updates charts + brush)
+// ═══════════════════════════════════════════════
+function applyRange(si, ei, skipBrush){
+  VS = Math.max(0, Math.min(si, N-2));
+  VE = Math.min(N-1, Math.max(ei, VS+3));
+  const sp = slice(ALL_SPREAD);
+  mainChart.data.labels            = slice(ALL_LABELS);
+  mainChart.data.datasets[0].data  = slice(ALL_DGS2);
+  mainChart.data.datasets[1].data  = slice(ALL_FF);
+  spreadChart.data.labels          = slice(ALL_LABELS);
+  spreadChart.data.datasets[0].data          = sp;
+  spreadChart.data.datasets[0].backgroundColor = sp.map(v=>v>=0?'#22c55e80':'#ef444470');
+  spreadChart.data.datasets[0].borderColor     = sp.map(v=>v>=0?'#22c55e'  :'#ef4444');
+  mainChart.update('none');
+  spreadChart.update('none');
+  if(!skipBrush) drawBrush();
+  updateInfo();
+}
+
+function setPreset(years, btn){
+  document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  if(years===null){ applyRange(0, N-1); }
+  else { applyRange(Math.max(0, N-1-years*12), N-1); }
+}
+
+function updateInfo(){
+  const n = VE - VS + 1;
+  document.getElementById('ctrlInfo').innerHTML =
+    `<span>${ALL_LABELS[VS]}</span> → <span>${ALL_LABELS[VE]}</span> &nbsp;·&nbsp; <span>${n} months</span>`;
+}
+
+// ═══════════════════════════════════════════════
+// BRUSH
+// ═══════════════════════════════════════════════
+const brushCanvas = document.getElementById('brushCanvas');
+const bCtx = brushCanvas.getContext('2d');
+
+// Pre-compute min/max for brush scale
+const dMin = Math.min(...ALL_DGS2, ...ALL_FF);
+const dMax = Math.max(...ALL_DGS2, ...ALL_FF);
+
+function drawBrush(){
+  const outer  = document.getElementById('brushOuter');
+  const W = outer.clientWidth;
+  const H = 72;
+  brushCanvas.width  = W;
+  brushCanvas.height = H;
+  brushCanvas.style.width  = W + 'px';
+  brushCanvas.style.height = H + 'px';
+
+  // Background
+  bCtx.fillStyle='#161b27';
+  bCtx.fillRect(0,0,W,H);
+
+  // Mini lines
+  function miniLine(data, color){
+    bCtx.beginPath(); bCtx.strokeStyle=color; bCtx.lineWidth=1;
+    data.forEach((v,i)=>{
+      const x = (i/(N-1))*W;
+      const y = H-4 - ((v-dMin)/(dMax-dMin))*(H-10);
+      i===0 ? bCtx.moveTo(x,y) : bCtx.lineTo(x,y);
+    });
+    bCtx.stroke();
+  }
+  miniLine(ALL_FF,   '#f9731650');
+  miniLine(ALL_DGS2, '#60a5fa70');
+
+  // Selected region
+  const x0 = (VS/(N-1))*W;
+  const x1 = (VE/(N-1))*W;
+
+  // Dark masks outside selection
+  bCtx.fillStyle='rgba(15,17,23,.72)';
+  bCtx.fillRect(0,0,x0,H);
+  bCtx.fillRect(x1,0,W-x1,H);
+
+  // Selection border
+  bCtx.strokeStyle='#3b82f6'; bCtx.lineWidth=1.5; bCtx.setLineDash([]);
+  bCtx.strokeRect(x0,0,x1-x0,H);
+
+  // Handles
+  const hw=6;
+  bCtx.fillStyle='#3b82f6';
+  bCtx.beginPath(); bCtx.roundRect(x0-hw/2, 2, hw, H-4, 3); bCtx.fill();
+  bCtx.beginPath(); bCtx.roundRect(x1-hw/2, 2, hw, H-4, 3); bCtx.fill();
+
+  // Handle grips (3 tiny lines)
+  bCtx.strokeStyle='rgba(255,255,255,.45)'; bCtx.lineWidth=1; bCtx.setLineDash([]);
+  [-3,0,3].forEach(dy=>{
+    const my = H/2+dy;
+    [x0, x1].forEach(hx=>{
+      bCtx.beginPath(); bCtx.moveTo(hx-1, my); bCtx.lineTo(hx+1, my); bCtx.stroke();
+    });
+  });
+
+  // Date labels under handles
+  bCtx.font='9px system-ui'; bCtx.textAlign='center'; bCtx.fillStyle='#94a3b8';
+  bCtx.fillText(ALL_LABELS[VS], Math.min(x0+22, W-30), H-2);
+  bCtx.fillText(ALL_LABELS[VE], Math.max(x1-22, 30),   H-2);
+}
+
+// Brush mouse interaction
+const HIT = 10; // px proximity for handle grab
+let bDrag = null, bDragX0=0, bDragVS0=0, bDragVE0=0;
+
+function bXtoIdx(x){
+  const W = brushCanvas.width;
+  return Math.round(Math.max(0, Math.min(1, x/W)) * (N-1));
+}
+function bIdxToX(idx){ return (idx/(N-1)) * brushCanvas.width; }
+
+brushCanvas.addEventListener('mousedown', e=>{
+  const rect = brushCanvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (brushCanvas.width / rect.width);
+  const xL = bIdxToX(VS);
+  const xR = bIdxToX(VE);
+  if(Math.abs(x-xL) <= HIT)       bDrag = 'left';
+  else if(Math.abs(x-xR) <= HIT)  bDrag = 'right';
+  else if(x > xL && x < xR)       bDrag = 'mid';
+  if(bDrag){ bDragX0=x; bDragVS0=VS; bDragVE0=VE; e.preventDefault(); }
+});
+
+window.addEventListener('mousemove', e=>{
+  if(!bDrag) return;
+  const rect = brushCanvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (brushCanvas.width / rect.width);
+  const dx = x - bDragX0;
+  const dIdx = Math.round((dx / brushCanvas.width) * (N-1));
+  const MIN = 3;
+  if(bDrag==='left'){
+    applyRange(Math.max(0, Math.min(bDragVS0+dIdx, VE-MIN)), VE, false);
+  } else if(bDrag==='right'){
+    applyRange(VS, Math.min(N-1, Math.max(bDragVE0+dIdx, VS+MIN)), false);
+  } else {
+    const w = bDragVE0 - bDragVS0;
+    const ns = Math.max(0, Math.min(bDragVS0+dIdx, N-1-w));
+    applyRange(ns, ns+w, false);
+  }
+});
+
+window.addEventListener('mouseup', ()=>{ bDrag=null; });
+
+// Cursor changes
+brushCanvas.addEventListener('mousemove', e=>{
+  if(bDrag) return;
+  const rect = brushCanvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (brushCanvas.width / rect.width);
+  const xL = bIdxToX(VS), xR = bIdxToX(VE);
+  if(Math.abs(x-xL)<=HIT || Math.abs(x-xR)<=HIT) brushCanvas.style.cursor='ew-resize';
+  else if(x>xL && x<xR) brushCanvas.style.cursor='grab';
+  else brushCanvas.style.cursor='crosshair';
+});
+
+// Click outside selection → re-centre
+brushCanvas.addEventListener('click', e=>{
+  if(bDrag) return;
+  const rect = brushCanvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (brushCanvas.width / rect.width);
+  const xL = bIdxToX(VS), xR = bIdxToX(VE);
+  if(x < xL || x > xR){
+    const half = Math.round((VE-VS)/2);
+    const ci = bXtoIdx(x);
+    applyRange(Math.max(0,ci-half), Math.min(N-1,ci+half));
+  }
+});
+
+window.addEventListener('resize', ()=>{ drawBrush(); });
+
+// ═══════════════════════════════════════════════
+// STABILITY TABLE
+// ═══════════════════════════════════════════════
+const stabBody = document.getElementById('stabBody');
+STABILITY_WINDOWS.forEach(w=>{
+  const up = w.leadMove > 0;
+  const cls = up ? 'up' : 'down';
+  const lead = w.leadAhead != null ? `${w.leadAhead}m` : '— ongoing';
+  stabBody.innerHTML += `<tr>
+    <td class="period">${w.start} → ${w.end}</td>
+    <td style="color:#64748b">${w.length}m</td>
+    <td>${w.ffr.toFixed(2)}%</td>
+    <td>${w.dgs2Start.toFixed(2)}%</td>
+    <td>${w.leadMonth??'—'}</td>
+    <td class="${cls}">${up?'↑':'↓'} ${Math.abs(w.leadMove).toFixed(2)}%</td>
+    <td class="${cls}">${lead}</td>
+    <td><span class="badge ${w.length>=6?'bm':'bs'}">${w.length>=6?'Major':'Minor'}</span></td>
+  </tr>`;
+});
+
+// ═══════════════════════════════════════════════
+// EVENTS — DECADE TABS
+// ═══════════════════════════════════════════════
+function switchDecade(idx, btn){
+  document.querySelectorAll('.dec-btn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.dec-panel').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('dec'+idx).classList.add('on');
+}
+
+function evDecade(month){
+  const yr = parseInt(month.slice(0,4));
+  if(yr < 2010) return 0;
+  if(yr < 2020) return 1;
+  return 2;
+}
+
+EVENTS.forEach(ev=>{
+  const gIdx = ALL_LABELS.indexOf(ev.month);
+  const sp   = gIdx>=0 ? ALL_SPREAD[gIdx] : null;
+  const bg   = sp!=null ? (sp>=0?'#14432a':'#3b1f1f') : '#1e2535';
+  const col  = sp!=null ? (sp>=0?'#4ade80':'#f87171') : '#94a3b8';
+  const el   = document.createElement('div');
+  el.className='ev'; el.style.borderLeftColor=ev.color;
+  el.innerHTML=`
+    <div class="ev-date" style="color:${ev.color}">${ev.month}</div>
+    <div class="ev-name">${ev.name}</div>
+    <div class="ev-desc">${ev.desc}</div>
+    ${sp!=null?`<span class="sp-badge" style="background:${bg};color:${col}">Spread: ${sp>=0?'+':''}${sp.toFixed(2)}%</span>`:''}`;
+  el.addEventListener('click',()=>{
+    if(gIdx<0) return;
+    document.querySelectorAll('.pbtn').forEach(b=>b.classList.remove('on'));
+    applyRange(Math.max(0,gIdx-12), Math.min(N-1,gIdx+12));
+    document.querySelector('.charts').scrollIntoView({behavior:'smooth'});
+  });
+  document.getElementById('evGrid'+evDecade(ev.month)).appendChild(el);
+});
+
+// ═══════════════════════════════════════════════
+// SERIES TOGGLES
+// ═══════════════════════════════════════════════
+function toggleSeries(idx){
+  if(idx === 2){
+    // Toggle spread chart visibility
+    const section = document.getElementById('spreadSection');
+    const tog = document.getElementById('tog2');
+    const hidden = section.style.display === 'none';
+    section.style.display = hidden ? '' : 'none';
+    tog.classList.toggle('off', !hidden);
+  } else {
+    const ds  = mainChart.data.datasets[idx];
+    const tog = document.getElementById('tog'+idx);
+    ds.hidden = !ds.hidden;
+    tog.classList.toggle('off', ds.hidden);
+    mainChart.update('none');
+  }
+}
+
+function toggleEvents(){
+  showEvents = !showEvents;
+  document.getElementById('togEv').classList.toggle('off', !showEvents);
+  mainChart.update('none');
+}
+
+// ═══════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════
+function switchTab(idx, btn){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('on'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('tab'+idx).classList.add('on');
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+updateInfo();
+// Draw brush after layout settles
+requestAnimationFrame(()=>{ requestAnimationFrame(()=>{ drawBrush(); }); });
+</script>
+</body>
+</html>
